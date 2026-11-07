@@ -1,0 +1,134 @@
+# melange workshop: build each platform package version ONCE, store it in the apk mirror (an immutable
+# GitHub release per package version), never rebuild it. Image builds download it from there.
+name: melange
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "melange/**"
+      - "keys/nodejs/**"
+      - ".github/workflows/melange.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: melange
+  cancel-in-progress: false
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      recipes: ${{ steps.plan.outputs.recipes }}
+      any: ${{ steps.plan.outputs.any }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          todo=()
+          for r in melange/*.yaml; do
+            tag=$(node scripts/apks.mjs tag "$r")
+            if node scripts/apks.mjs exists "$r" >/dev/null; then
+              echo "keep $tag: already in the mirror (immutable)"
+            else
+              echo "build $tag"; todo+=("$(basename "$r" .yaml)")
+            fi
+          done
+          json=$(printf '%s\n' "${todo[@]:-}" | jq -R . | jq -sc 'map(select(length > 0))')
+          echo "recipes=$json" >> "$GITHUB_OUTPUT"
+          echo "any=$([ "$json" = "[]" ] && echo false || echo true)" >> "$GITHUB_OUTPUT"
+
+  verify-node:
+    # GPG check of the official Node.js release against nodejs/release-keys (committed keyring), and
+    # equality of the recipe's pinned sha256 values with the signed SHASUMS256.txt. Blocking.
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - run: scripts/verify-node-release.sh melange/nodejs-26-official.yaml
+
+  build:
+    needs: [plan, verify-node]
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      fail-fast: true
+      matrix:
+        recipe: ${{ fromJSON(needs.plan.outputs.recipes) }}
+        arch: [x86_64, aarch64]
+    # native runners for both architectures: no emulation, one ephemeral key per (package, arch)
+    runs-on: ${{ matrix.arch == 'aarch64' && 'ubuntu-24.04-arm' || 'ubuntu-24.04' }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - name: Install pinned tools
+        run: scripts/install-tools.sh && echo "$PWD/.bin" >> "$GITHUB_PATH"
+      - name: Build with an ephemeral signing key
+        env:
+          RECIPE: ${{ matrix.recipe }}
+          ARCH: ${{ matrix.arch }}
+        run: |
+          set -euo pipefail
+          recipe="melange/${RECIPE}.yaml"
+          id=$(node scripts/apks.mjs id "$recipe")
+          keydir=$(mktemp -d)
+          (cd "$keydir" && melange keygen "${id}-${ARCH}.rsa" >/dev/null)
+          export SOURCE_DATE_EPOCH=$(git log -1 --format=%ct -- "$recipe")
+          (cd melange && melange build "${RECIPE}.yaml" --arch "$ARCH" --runner docker \
+            --signing-key "$keydir/${id}-${ARCH}.rsa" --out-dir "$RUNNER_TEMP/out" \
+            --git-commit "$GITHUB_SHA" --git-repo-url "https://github.com/${GITHUB_REPOSITORY}")
+          mkdir -p "$RUNNER_TEMP/stage"
+          node scripts/apks.mjs stage "$recipe" "$RUNNER_TEMP/out" "$RUNNER_TEMP/stage"
+          cp "$keydir/${id}-${ARCH}.rsa.pub" "$RUNNER_TEMP/stage/"
+          # the private key never leaves this job
+          shred -u "$keydir/${id}-${ARCH}.rsa"; rm -rf "$keydir"
+          ls -la "$RUNNER_TEMP/stage"
+      - name: Gate the packages (no Python, no shell dependency, no setuid)
+        run: node scripts/apk-gates.mjs "$RUNNER_TEMP/stage"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: apk-${{ matrix.recipe }}-${{ matrix.arch }}
+          path: ${{ runner.temp }}/stage/
+          retention-days: 7
+          if-no-files-found: error
+
+  release:
+    needs: [plan, build]
+    if: needs.plan.outputs.any == 'true'
+    strategy:
+      matrix:
+        recipe: ${{ fromJSON(needs.plan.outputs.recipes) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: apk-${{ matrix.recipe }}-*
+          merge-multiple: true
+          path: stage
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: stage/*.apk
+      - name: Store in the mirror (immutable release)
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RECIPE: ${{ matrix.recipe }}
+        run: |
+          set -euo pipefail
+          recipe="melange/${RECIPE}.yaml"
+          tag=$(node scripts/apks.mjs tag "$recipe")
+          (cd stage && sha256sum * > SHA256SUMS)
+          notes="melange package ${tag#apk-}, built once from \`${recipe}\` at ${GITHUB_SHA}.
+          Assets: <arch>.<file>; *.rsa.pub are the public halves of the ephemeral per-arch signing keys.
+          Immutable: a new version or epoch gets a new release. Provenance: \`gh attestation verify <apk> --repo ${GITHUB_REPOSITORY}\`."
+          gh release create "$tag" stage/* --repo "$GITHUB_REPOSITORY" --target "$GITHUB_SHA" \
+            --title "$tag" --notes "$notes" --latest=false

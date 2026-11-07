@@ -1,0 +1,183 @@
+# Daily vulnerability supervision and findings-driven rollout (owner decision D3, 2026-11-07):
+# « Supervision faille daily. En fonction des failles. Max 1/j min 1/mois ».
+#   scan    grype --only-fixed on every published digest; Wolfi advisory diff (CPE-free) between the
+#           committed locks and freshly resolved ones; Node.js 26 security releases; workshop freshness
+#   decide  scripts/rollout.mjs: cap 1/day, floor 28 days, lane security|routine
+#   build   only the images that roll today, from the refreshed locks committed by this job
+#   record  rollout.json (the dispatcher's input) + dispatcher DRY-RUN (P1: prints the PR, opens none)
+name: daily
+
+on:
+  schedule:
+    - cron: "23 5 * * *"
+  workflow_dispatch:
+    inputs:
+      force:
+        description: "Force a rollout today with this reason (bypasses the daily cap; leave empty normally)"
+        default: ""
+
+permissions:
+  contents: read
+
+concurrency:
+  group: daily
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      issues: write
+    outputs:
+      rollout: ${{ steps.decide.outputs.rollout }}
+      images: ${{ steps.decide.outputs.images }}
+      lane: ${{ steps.decide.outputs.lane }}
+      sha: ${{ steps.commit.outputs.sha }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+      GRYPE_DB_CACHE_DIR: ${{ github.workspace }}/.work/grype-db
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          fetch-depth: 0
+      - run: scripts/install-tools.sh && echo "$PWD/.bin" >> "$GITHUB_PATH"
+      - id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .work/grype-db
+          key: grype-db-${{ steps.day.outputs.day }}
+      - name: Wolfi security feed and index
+        run: |
+          set -euo pipefail
+          mkdir -p .work/feed
+          curl -sSfL --retry 3 -o .work/feed/security.json https://packages.wolfi.dev/os/security.json
+          curl -sSfL --retry 3 https://packages.wolfi.dev/os/x86_64/APKINDEX.tar.gz | tar -xzO APKINDEX > .work/feed/APKINDEX
+      - name: Scan the published digests (grype --only-fixed)
+        run: |
+          set -euo pipefail
+          mkdir -p .work/scans
+          for name in $(jq -r '.current | keys[]' rollout.json); do
+            ref=$(jq -r --arg n "$name" '.current[$n] | "\(.ref)@\(.digest)"' rollout.json)
+            node scripts/scan.mjs ref "$ref" --report ".work/scans/$name.json" || true
+          done
+      - name: Resolve fresh locks
+        run: |
+          set -euo pipefail
+          node scripts/apks.mjs fetch --catalog
+          for name in $(jq -r '.images | keys[]' images.json); do node scripts/image.mjs lock "$name"; done
+          git status --short images/
+      - name: Fix-available gate (Wolfi secfixes, no CPE)
+        run: node scripts/fix-gate.mjs --security .work/feed/security.json --index .work/feed/APKINDEX --report .work/fixes.json
+      - name: Decide (max 1/day, min 1/month)
+        id: decide
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -euo pipefail
+          args=(decide --fixes .work/fixes.json --scans .work/scans --out .work/decision.json)
+          [ -n "${FORCE:-}" ] && args+=(--force "$FORCE")
+          node scripts/rollout.mjs "${args[@]}"
+      - name: Commit the refreshed locks of the images that roll today
+        id: commit
+        env:
+          ROLLOUT: ${{ steps.decide.outputs.rollout }}
+        run: |
+          set -euo pipefail
+          refresh=$(jq -r '.images | to_entries[] | select(.value.refreshLock) | .key' .work/decision.json)
+          for name in $(jq -r '.images | keys[]' images.json); do
+            echo "$refresh" | grep -qx "$name" || git checkout -- "images/$name/apko.lock.json" 2>/dev/null || true
+          done
+          if [ "$ROLLOUT" = "true" ] && ! git diff --quiet -- images/; then
+            ids=$(jq -r '[.images[].ids[]] | unique | length' .work/decision.json)
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add images/*/apko.lock.json
+            git commit -m "chore(locks): refresh $(echo $refresh | tr ' ' ','), $ids advisory id(s) fixed" -m "$(jq -r '.images | to_entries[] | "\(.key): \(.value.reasons | join(", ")) \(.value.ids | join(" "))"' .work/decision.json)"
+            git push origin HEAD:main
+          fi
+          echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - name: Summary and alerts
+        if: always()
+        run: |
+          {
+            echo "## Daily scan $(date -u +%F)"
+            echo '```'
+            jq -c '{rollout, reason, lane, images: (.images | keys), notes}' .work/decision.json 2>/dev/null
+            echo '```'
+            echo "### Published digests (grype --only-fixed, High/Critical with a fix)"
+            for f in .work/scans/*.json; do [ -f "$f" ] && jq -r '"- \(.subject | split("/")[-1]): \(.blocking | length) blocking; " + ([.results[] | "\(.arch) \(.total) matches (\(.cpeOnly) CPE-only), \(.fixed) fixable"] | join("; "))' "$f"; done
+            echo "### Advisory diff"
+            jq -r '.images | to_entries[] | "- \(.key): \(.value.fixes | length) fix(es) available, \(.value.pendingFixes | length) pending"' .work/fixes.json 2>/dev/null
+            jq -r '"- node: recipe \(.node.recipe), newer 26.x: \([.node.newer[]? | .version + (if .security then " (security)" else "" end)] | join(", "))"' .work/fixes.json 2>/dev/null
+            jq -r '.workshop[] | "- workshop \(.recipe): pinned \(.pinned), Wolfi \(.source) \(.wolfiNewest)\(if .bumpNeeded then " -> bump needed" else "" end)"' .work/fixes.json 2>/dev/null
+          } >> "$GITHUB_STEP_SUMMARY"
+          # One open issue while a published base has a fixable High/Critical, or a Node security release
+          # is not in the recipe. Fixes that need a recipe bump (npm, Node) cannot ride a lock refresh.
+          need=$(jq -s '[.[].blocking[]] | length' .work/scans/*.json 2>/dev/null || echo 0)
+          nodesec=$(jq -r '.node.securityRelease // false' .work/fixes.json 2>/dev/null || echo false)
+          if [ "${need:-0}" != "0" ] || [ "$nodesec" = "true" ]; then
+            title="Fixable High/Critical in a published base image"
+            body=$(jq -sr '[.[] | .subject as $s | .blocking[] | "- \($s | split("/")[-1]) \(.arch): \(.severity) \(.id) in \(.pkg) \(.version), fixed in \(.fixedIn | join(","))"] | join("\n")' .work/scans/*.json 2>/dev/null)
+            [ "$nodesec" = "true" ] && body="$body
+          - Node.js 26 security release newer than melange/nodejs-26-official.yaml: bump the recipe (scripts/verify-node-release.sh)"
+            num=$(gh issue list --state open --search "in:title \"$title\"" --json number -q '.[0].number' || true)
+            if [ -n "$num" ]; then gh issue comment "$num" --body "$(date -u +%F): still open
+          $body"; else gh issue create --title "$title" --body "$body"; fi
+          fi
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: daily-decision
+          path: |
+            .work/decision.json
+            .work/fixes.json
+            .work/scans/
+
+  build:
+    needs: scan
+    if: needs.scan.outputs.rollout == 'true'
+    uses: ./.github/workflows/build.yml
+    with:
+      images: ${{ needs.scan.outputs.images }}
+      publish: true
+      ref: ${{ needs.scan.outputs.sha }}
+    permissions:
+      contents: write
+      packages: write
+      id-token: write
+      attestations: write
+
+  record:
+    needs: [scan, build]
+    if: needs.scan.outputs.rollout == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: main
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: daily-decision
+          path: .work
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: .work/results
+      - name: Record the rollout
+        run: |
+          set -euo pipefail
+          node scripts/rollout.mjs record --decision .work/decision.json --results .work/results
+          if ! git diff --quiet -- rollout.json; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git add rollout.json
+            git commit -m "chore(rollout): $(jq -r '.rollouts[-1] | "\(.id) \(.reason) (\(.lane)): \(.images | keys | join(","))"' rollout.json)"
+            git push origin HEAD:main
+          fi
+      - name: Dispatcher dry-run (P1, against the fixture tenant)
+        run: node scripts/dispatch.mjs --root test/fixtures/tenant --rollout rollout.json --dry-run

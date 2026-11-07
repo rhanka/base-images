@@ -1,0 +1,83 @@
+# Node.js 26 from the official nodejs.org binary (owner decision D1 = B).
+# The two expected-sha256 values below are checked against the GPG-signed SHASUMS256.txt of the
+# release by scripts/verify-node-release.sh (blocking step of the melange workflow).
+# Built once per version and stored in the apk mirror (release assets); image builds never rebuild it.
+#
+# npm: the subpackage ships npm ${{vars.npm-version}} from the npm registry (sha512 = registry dist.integrity),
+# not the npm bundled in the Node tarball: Node 26.13.0 bundles npm 11.20.0, whose brace-expansion 5.0.9 and
+# undici 6.28.0 carry fixable High advisories (grype gate). Same npm major as bundled.
+package:
+  name: nodejs-26-official
+  version: 26.13.0
+  epoch: 0
+  description: "Node.js 26 LTS, official nodejs.org linux binary repackaged (bundled OpenSSL and ICU)"
+  url: https://nodejs.org/
+  copyright:
+    - license: MIT
+  target-architecture:
+    - x86_64
+    - aarch64
+  dependencies:
+    provides:
+      - nodejs=${{package.full-version}}
+      - cmd:node=${{package.full-version}}
+    runtime:
+      - libatomic
+
+vars:
+  npm-version: 11.21.2
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+    packages:
+      - busybox
+      - xz
+
+pipeline:
+  - if: ${{build.arch}} == 'x86_64'
+    uses: fetch
+    with:
+      uri: https://nodejs.org/dist/v${{package.version}}/node-v${{package.version}}-linux-x64.tar.xz
+      expected-sha256: d28a96af6c38596f6d9d97c0ee531c13d238d757742387d1928de822d959e997 # x64
+  - if: ${{build.arch}} == 'aarch64'
+    uses: fetch
+    with:
+      uri: https://nodejs.org/dist/v${{package.version}}/node-v${{package.version}}-linux-arm64.tar.xz
+      expected-sha256: 406fe3fbde1c054adff8b297c16fdb5af6659db327c1ac8acd46b56ef1af9a92 # arm64
+  - runs: mkdir -p npm-src
+  - uses: fetch
+    with:
+      uri: https://registry.npmjs.org/npm/-/npm-${{vars.npm-version}}.tgz
+      expected-sha512: ec73c0a64f807e53146af4ac78bd4f9ba0a762a3081e4e77c7e2a6ba1aa64c3a8f9233cc8312294cf713aac13dd4428dc3880504957d7e75e249d1a6d435eaf4
+      directory: npm-src
+      purl-name: npm
+      purl-version: ${{vars.npm-version}}
+  - runs: |
+      install -Dm755 bin/node "${{targets.destdir}}/usr/bin/node"
+      install -Dm644 LICENSE "${{targets.destdir}}/usr/share/licenses/${{package.name}}/LICENSE"
+
+subpackages:
+  - name: nodejs-26-official-npm
+    description: "npm ${{vars.npm-version}} for the official Node.js 26 binary (development images only)"
+    dependencies:
+      provides:
+        - npm=${{package.full-version}}
+        - cmd:npm=${{package.full-version}}
+        - cmd:npx=${{package.full-version}}
+      runtime:
+        - nodejs-26-official
+    pipeline:
+      - runs: |
+          mkdir -p "${{targets.subpkgdir}}/usr/lib/node_modules" "${{targets.subpkgdir}}/usr/bin"
+          cp -a npm-src "${{targets.subpkgdir}}/usr/lib/node_modules/npm"
+          ln -s ../lib/node_modules/npm/bin/npm-cli.js "${{targets.subpkgdir}}/usr/bin/npm"
+          ln -s ../lib/node_modules/npm/bin/npx-cli.js "${{targets.subpkgdir}}/usr/bin/npx"
+          # Windows launchers are dead weight on Linux.
+          find "${{targets.subpkgdir}}/usr/lib/node_modules/npm" \( -name '*.cmd' -o -name '*.ps1' \) -delete
+
+update:
+  enabled: false # bumps by reviewed PR; the daily scan reports new Node 26 releases (index.json)

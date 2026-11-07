@@ -1,0 +1,47 @@
+# libatspi only, for the e2e trial image. Chromium headless needs libatk-bridge-2.0, which needs
+# libatspi.so.0, which Wolfi ships only inside at-spi2-core, and at-spi2-core depends on
+# python-3.13-base (for its gi/overrides/Atspi.py). This subset keeps the shared library only.
+# Source: the signed Wolfi at-spi2-core apk, pinned by sha256 per architecture.
+package:
+  name: at-spi2-core-libatspi
+  version: 2.62.1
+  epoch: 0 # mirrors the Wolfi revision r0 of the source apk
+  description: "libatspi.so.0 from at-spi2-core, without the Python bindings"
+  url: https://gitlab.gnome.org/GNOME/at-spi2-core
+  copyright:
+    - license: LGPL-2.1-or-later
+  target-architecture:
+    - x86_64
+    - aarch64
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+    packages:
+      - busybox
+
+pipeline:
+  - if: ${{build.arch}} == 'x86_64'
+    uses: fetch
+    with:
+      uri: https://packages.wolfi.dev/os/x86_64/at-spi2-core-${{package.version}}-r${{package.epoch}}.apk
+      expected-sha256: 7c4c63dd1ac76ea2bf3269d22e79b5a5758c0b1d9cf8dc856a79ce2e1d1545d9
+      extract: false
+  - if: ${{build.arch}} == 'aarch64'
+    uses: fetch
+    with:
+      uri: https://packages.wolfi.dev/os/aarch64/at-spi2-core-${{package.version}}-r${{package.epoch}}.apk
+      expected-sha256: 258840eec648177fc224de417203101b0f77b813e8abb79749a367e9858ca3c5
+      extract: false
+  - runs: |
+      mkdir src
+      gzip -dc at-spi2-core-*.apk | tar -x -C src 2>/dev/null || true
+      test -f src/usr/lib/libatspi.so.0.0.1
+      mkdir -p "${{targets.destdir}}/usr/lib"
+      cp -a src/usr/lib/libatspi.so.0 src/usr/lib/libatspi.so.0.0.1 "${{targets.destdir}}/usr/lib/"
+
+update:
+  enabled: false

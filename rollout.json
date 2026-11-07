@@ -1,0 +1,14 @@
+{
+  "schema": 1,
+  "registry": "ghcr.io/rhanka/base",
+  "policy": {
+    "rule": "Supervision faille daily. En fonction des failles. Max 1/j min 1/mois (owner, 2026-11-07)",
+    "scan": "daily",
+    "maxRolloutsPerDay": 1,
+    "floorDays": 28,
+    "prodGo": "owner GO for each rollout that is green in preprod",
+    "dispatcher": "dry-run (P1); opening PRs is enabled in P3"
+  },
+  "current": {},
+  "rollouts": []
+}

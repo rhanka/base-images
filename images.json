@@ -1,0 +1,111 @@
+{
+  "registry": "ghcr.io/rhanka/base",
+  "kinds": {
+    "runtime": "no shell, no package manager",
+    "jobs": "shell (busybox) allowed, no package manager",
+    "dev": "shell and package managers allowed; never a long-running service"
+  },
+  "images": {
+    "node": {
+      "track": "26",
+      "kind": "runtime",
+      "budgetMB": 65,
+      "platform": [
+        "nodejs-26-official"
+      ],
+      "smoke": [
+        [
+          "-e",
+          "console.log(process.version, 'openssl', process.versions.openssl, new Intl.DateTimeFormat('fr-CA').format(new Date(0)))"
+        ]
+      ]
+    },
+    "node-poppler": {
+      "track": "26",
+      "kind": "runtime",
+      "budgetMB": 85,
+      "platform": [
+        "nodejs-26-official"
+      ],
+      "smoke": [
+        [
+          "-e",
+          "console.log(process.version)"
+        ],
+        [
+          "--entrypoint=/usr/bin/pdftotext",
+          "-v"
+        ]
+      ]
+    },
+    "web": {
+      "track": "mainline",
+      "kind": "runtime",
+      "budgetMB": 10,
+      "platform": [
+        "nginx-unprivileged-config"
+      ],
+      "smoke": [
+        [
+          "-t"
+        ]
+      ]
+    },
+    "cc": {
+      "track": "glibc",
+      "kind": "runtime",
+      "budgetMB": 6,
+      "platform": [],
+      "smoke": [
+        [
+          "--entrypoint=/usr/lib/libc.so.6"
+        ]
+      ]
+    },
+    "toolbox": {
+      "track": "1",
+      "kind": "jobs",
+      "budgetMB": 30,
+      "platform": [],
+      "smoke": [
+        [
+          "/bin/sh",
+          "-c",
+          "s5cmd version && pg_dump --version && curl --version | head -1 && jq --version"
+        ]
+      ]
+    },
+    "node-dev": {
+      "track": "26",
+      "kind": "dev",
+      "budgetMB": 90,
+      "platform": [
+        "nodejs-26-official"
+      ],
+      "smoke": [
+        [
+          "/bin/bash",
+          "-c",
+          "node --version && npm --version && git --version && apk --version"
+        ]
+      ]
+    },
+    "e2e": {
+      "track": "trial",
+      "kind": "dev",
+      "trial": true,
+      "budgetMB": 260,
+      "platform": [
+        "nodejs-26-official",
+        "at-spi2-core-libatspi"
+      ],
+      "smoke": [
+        [
+          "/bin/bash",
+          "-c",
+          "node --version && npm --version"
+        ]
+      ]
+    }
+  }
+}

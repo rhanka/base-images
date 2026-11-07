@@ -1,0 +1,43 @@
+# Rollout dispatcher, reusable by tenant repositories (P1: DRY-RUN ONLY; opening PRs is P3).
+#
+# In a tenant repository:
+#   on: {schedule: [{cron: "41 6 * * *"}], workflow_dispatch: {}}
+#   jobs:
+#     base-images:
+#       uses: rhanka/base-images/.github/workflows/dispatch.yml@main
+#
+# It reads the public rollout.json of rhanka/base-images, finds every ghcr.io/rhanka/base/*@sha256:
+# reference in the tenant checkout, and prints the one pull request it would open. The tenant's own
+# GITHUB_TOKEN is the only credential; the base repository never lists tenant repositories.
+name: dispatch
+
+on:
+  workflow_call:
+    inputs:
+      dry-run:
+        description: "P1: always true (the input is ignored until P3)"
+        type: boolean
+        default: true
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  dispatch:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          path: tenant
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          repository: rhanka/base-images
+          ref: main
+          path: base-images
+      - name: Dispatcher (dry-run)
+        run: |
+          root=tenant
+          # self-test when run inside the base repository itself
+          [ "$GITHUB_REPOSITORY" = "rhanka/base-images" ] && root=base-images/test/fixtures/tenant
+          node base-images/scripts/dispatch.mjs --root "$root" --rollout base-images/rollout.json --dry-run

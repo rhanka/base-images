@@ -1,0 +1,49 @@
+# Reduced GDAL tools for the geo variant: the five ELF binaries geo calls, nothing else.
+# Source: the signed Wolfi gdal-tools apk, pinned by sha256 per architecture. The Wolfi package also
+# ships 12 developer .py scripts and depends on cmd:bash; this subset has neither. melange generates
+# the so: dependencies (libgdal.so.39, glibc, libstdc++), so the Wolfi gdal library comes from the lock.
+# Bump together with the Wolfi gdal soname (see README, "melange workshop").
+package:
+  name: gdal-tools-geo
+  version: 3.13.3
+  epoch: 6 # mirrors the Wolfi revision r6 of the source apk
+  description: "GDAL ogr2ogr, ogrinfo, gdalinfo, gdal_translate, gdalsrsinfo (no scripts, no shell)"
+  url: https://gdal.org/
+  copyright:
+    - license: MIT
+  target-architecture:
+    - x86_64
+    - aarch64
+
+environment:
+  contents:
+    keyring:
+      - https://packages.wolfi.dev/os/wolfi-signing.rsa.pub
+    repositories:
+      - https://packages.wolfi.dev/os
+    packages:
+      - busybox
+
+pipeline:
+  - if: ${{build.arch}} == 'x86_64'
+    uses: fetch
+    with:
+      uri: https://packages.wolfi.dev/os/x86_64/gdal-tools-${{package.version}}-r${{package.epoch}}.apk
+      expected-sha256: e9e0cee40fbf6ad83b727842c97673254c9f5049dc61ceb2618876da51532e73
+      extract: false
+  - if: ${{build.arch}} == 'aarch64'
+    uses: fetch
+    with:
+      uri: https://packages.wolfi.dev/os/aarch64/gdal-tools-${{package.version}}-r${{package.epoch}}.apk
+      expected-sha256: c574e11e73005218eb1db8beba829cac1ae4be0a3e10bba62245c72956ed45a3
+      extract: false
+  - runs: |
+      mkdir src
+      gzip -dc gdal-tools-*.apk | tar -x -C src 2>/dev/null || true
+      for b in ogr2ogr ogrinfo gdalinfo gdal_translate gdalsrsinfo; do
+        test -f "src/usr/bin/$b"
+        install -Dm755 "src/usr/bin/$b" "${{targets.destdir}}/usr/bin/$b"
+      done
+
+update:
+  enabled: false

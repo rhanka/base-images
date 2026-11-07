@@ -1,0 +1,43 @@
+# Checks on every pull request and push: script tests, recipe signature pins, shell lint, secret scan,
+# lock consistency. No publishing.
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Script tests (node --test)
+        run: node --test test/*.test.mjs
+      - name: Node.js release pins match the GPG-signed SHASUMS256.txt
+        run: scripts/verify-node-release.sh melange/nodejs-26-official.yaml
+      - name: shellcheck
+        run: shellcheck scripts/*.sh test/e2e-trial/*.sh
+      - name: No Python in the repository
+        run: |
+          if git ls-files | grep -E '\.py$|(^|/)requirements.*\.txt$|(^|/)(pyproject\.toml|setup\.py|Pipfile)$'; then
+            echo "::error::Python files are not allowed in this repository"; exit 1
+          fi
+          if grep -nE '^\s+(run: )?(python3?|pip3?|pipx|uv|poetry)( |$)' .github/workflows/*.yml scripts/*.sh test/e2e-trial/*.sh; then
+            echo "::error::a workflow or script calls Python"; exit 1
+          fi
+      - name: No secret in the tree
+        run: scripts/secret-scan.sh
+      - name: Every image has a lock whose config checksum matches
+        run: |
+          set -euo pipefail
+          for d in images/*/; do
+            n=$(basename "$d")
+            if [ ! -f "$d/apko.lock.json" ]; then echo "::warning::$n has no lock yet (node scripts/image.mjs lock $n)"; continue; fi
+            want=$(jq -r .config.checksum "$d/apko.lock.json")
+            have="sha256-$(sha256sum "$d/apko.yaml" | cut -d' ' -f1 | xxd -r -p | base64)"
+            [ "$want" = "$have" ] || { echo "::error::$n: apko.yaml changed since the lock (run node scripts/image.mjs lock $n)"; exit 1; }
+          done

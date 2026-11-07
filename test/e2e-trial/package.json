@@ -1,0 +1,9 @@
+{
+  "name": "e2e-trial",
+  "private": true,
+  "type": "module",
+  "description": "Trial: Playwright's own Chromium on the Wolfi-based e2e image",
+  "dependencies": {
+    "playwright": "1.63.0"
+  }
+}

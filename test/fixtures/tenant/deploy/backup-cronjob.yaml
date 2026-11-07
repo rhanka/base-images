@@ -1,0 +1,15 @@
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: backup
+spec:
+  schedule: "0 3 * * *"
+  jobTemplate:
+    spec:
+      template:
+        spec:
+          restartPolicy: OnFailure
+          containers:
+            - name: dump
+              image: ghcr.io/rhanka/base/toolbox:1@sha256:3333333333333333333333333333333333333333333333333333333333333333
+              command: ["/bin/sh", "-c", "pg_dump --version"]

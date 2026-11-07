@@ -1,0 +1,283 @@
+# Build, gate, publish, sign and attest the base images (both architectures) from the committed locks.
+# Signing identity (cosign keyless, GitHub OIDC):
+#   https://github.com/rhanka/base-images/.github/workflows/build.yml@refs/heads/main
+name: build
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "images/**"
+      - "images.json"
+      - "keys/wolfi-signing.rsa.pub"
+  workflow_dispatch:
+    inputs:
+      images:
+        description: 'JSON list of images, or "all"'
+        default: "all"
+      publish:
+        description: "Publish when the digest differs from the published one"
+        type: boolean
+        default: true
+  workflow_call:
+    inputs:
+      images:
+        type: string
+        default: "all"
+      publish:
+        type: boolean
+        default: true
+      ref:
+        description: "commit to build (the daily job passes its lock-refresh commit)"
+        type: string
+        default: ""
+    outputs:
+      results:
+        value: ${{ jobs.collect.outputs.results }}
+
+permissions:
+  contents: read
+
+jobs:
+  matrix:
+    runs-on: ubuntu-24.04
+    outputs:
+      images: ${{ steps.m.outputs.images }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - id: m
+        env:
+          WANT: ${{ inputs.images || 'all' }}
+        run: |
+          node -e '
+            const c = require("./images.json"); const w = process.env.WANT;
+            const all = Object.keys(c.images);
+            const fs = require("fs");
+            const locked = all.filter((n) => fs.existsSync(`images/${n}/apko.lock.json`));
+            for (const n of all) if (!locked.includes(n)) console.log(`::notice::${n}: no lock yet, skipped`);
+            const list = w === "all" ? locked : JSON.parse(w).filter((n) => locked.includes(n));
+            fs.appendFileSync(process.env.GITHUB_OUTPUT, `images=${JSON.stringify(list)}\n`);
+            console.log(list.join(" "));'
+
+  image:
+    needs: matrix
+    if: needs.matrix.outputs.images != '[]'
+    strategy:
+      fail-fast: false
+      matrix:
+        image: ${{ fromJSON(needs.matrix.outputs.images) }}
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+      attestations: write
+    env:
+      NAME: ${{ matrix.image }}
+      GH_TOKEN: ${{ github.token }}
+      GRYPE_DB_CACHE_DIR: ${{ github.workspace }}/.work/grype-db
+      PUBLISH: ${{ github.event_name == 'push' || inputs.publish }}
+      IDENTITY: https://github.com/${{ github.repository }}/.github/workflows/build.yml@refs/heads/main
+      ISSUER: https://token.actions.githubusercontent.com
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - name: Install pinned tools
+        run: scripts/install-tools.sh && echo "$PWD/.bin" >> "$GITHUB_PATH"
+      - id: day
+        run: echo "day=$(date -u +%F)" >> "$GITHUB_OUTPUT"
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .work/grype-db
+          key: grype-db-${{ steps.day.outputs.day }}
+      - name: Fetch platform apks from the mirror
+        run: node scripts/apks.mjs fetch --lock "images/$NAME/apko.lock.json"
+      - name: Build from the lock (twice, compare digests)
+        id: build
+        run: |
+          set -euo pipefail
+          d1=$(node scripts/image.mjs build "$NAME" --out out/a | tail -1)
+          d2=$(node scripts/image.mjs build "$NAME" --out out/b | tail -1)
+          echo "build 1: $d1"; echo "build 2: $d2"
+          if [ "$d1" != "$d2" ]; then echo "::error::not reproducible: $d1 != $d2"; exit 1; fi
+          echo "digest=$d1" >> "$GITHUB_OUTPUT"
+          rm -rf out/b
+      - name: Gates (Python, shell, package manager, setuid, apk deps, user, size)
+        run: node scripts/gates.mjs "$NAME" out/a/image.tar --report out/a/gates.json
+      - name: Smoke run (amd64, read-only rootfs, non-root, no capabilities)
+        run: node scripts/smoke.mjs "$NAME" out/a/image.tar
+      - name: grype --only-fixed --fail-on high (both architectures)
+        run: node scripts/scan.mjs tar "$NAME" out/a/image.tar --report out/a/scan.json
+      - name: Publish (only when the digest changed)
+        id: publish
+        if: env.PUBLISH == 'true'
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          ref=$(jq -r .ref out/a/build.json); repo=${ref%:*}
+          published=$(crane digest "$ref" 2>/dev/null || echo none)
+          echo "published $ref: $published; built: $DIGEST"
+          if [ "$published" = "$DIGEST" ]; then
+            echo "same lock, same digest: nothing to publish"
+            echo "published=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "${{ github.token }}" | docker login ghcr.io -u "${{ github.actor }}" --password-stdin
+            node scripts/image.mjs publish "$NAME" --out out/a
+            echo "published=true" >> "$GITHUB_OUTPUT"
+          fi
+          echo "repo=$repo" >> "$GITHUB_OUTPUT"
+      - name: Sign (cosign keyless) and attest the SBOMs
+        if: steps.publish.outputs.published == 'true'
+        env:
+          REPO: ${{ steps.publish.outputs.repo }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign sign --yes "$REPO@$DIGEST"
+          cosign attest --yes --type spdxjson --predicate out/a/sbom-index.spdx.json "$REPO@$DIGEST"
+          for pair in x86_64:amd64 aarch64:arm64; do
+            a=${pair%:*}; p=${pair#*:}
+            ad=$(crane digest --platform "linux/$p" "$REPO@$DIGEST")
+            cosign sign --yes "$REPO@$ad"
+            cosign attest --yes --type spdxjson --predicate "out/a/sbom-$a.spdx.json" "$REPO@$ad"
+          done
+      - name: Provenance attestation (GitHub, SLSA)
+        if: steps.publish.outputs.published == 'true'
+        uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-name: ${{ steps.publish.outputs.repo }}
+          subject-digest: ${{ steps.build.outputs.digest }}
+          push-to-registry: true
+      - name: Verify what was published
+        if: steps.publish.outputs.published == 'true'
+        env:
+          REPO: ${{ steps.publish.outputs.repo }}
+          DIGEST: ${{ steps.build.outputs.digest }}
+        run: |
+          set -euo pipefail
+          cosign verify "$REPO@$DIGEST" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" > /dev/null
+          cosign verify-attestation --type spdxjson "$REPO@$DIGEST" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" > /dev/null
+          gh attestation verify "oci://$REPO@$DIGEST" --repo "$GITHUB_REPOSITORY" --signer-workflow "$GITHUB_REPOSITORY/.github/workflows/build.yml"
+          echo "verified $REPO@$DIGEST"
+      - name: Result
+        if: always()
+        env:
+          DIGEST: ${{ steps.build.outputs.digest }}
+          PUBLISHED: ${{ steps.publish.outputs.published || 'false' }}
+        run: |
+          mkdir -p results
+          jq -n --arg image "$NAME" --arg digest "$DIGEST" --arg published "$PUBLISHED" \
+            --slurpfile b out/a/build.json --slurpfile g out/a/gates.json --slurpfile s out/a/scan.json \
+            '{image: $image, digest: $digest, published: ($published == "true"), lockSha256: $b[0].lockSha256, ref: $b[0].ref,
+              gates: $g[0].info, scan: [$s[0].results[] | {arch, total, cpeOnly, fixed}]}' > "results/$NAME.json" || true
+          cat "results/$NAME.json" || true
+          {
+            echo "### $NAME"
+            echo "- digest: \`$DIGEST\` (two builds from the same lock: identical)"
+            echo "- published this run: $PUBLISHED"
+            jq -r '"- amd64 compressed: \(.gates.amd64.compressedMB) MB, arm64: \(.gates.arm64.compressedMB) MB"' "results/$NAME.json" 2>/dev/null || true
+          } >> "$GITHUB_STEP_SUMMARY"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        if: always()
+        with:
+          name: result-${{ matrix.image }}
+          path: results/
+          if-no-files-found: ignore
+
+  e2e-trial:
+    # Trial: Playwright's own Chromium headless shell on the Wolfi e2e image, both architectures.
+    needs: matrix
+    if: contains(needs.matrix.outputs.images, 'e2e')
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-24.04, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+          fetch-depth: 0
+      - run: scripts/install-tools.sh && echo "$PWD/.bin" >> "$GITHUB_PATH"
+      - run: node scripts/apks.mjs fetch --lock images/e2e/apko.lock.json
+      - name: Build for the runner architecture
+        run: |
+          arch=$([ "$(uname -m)" = aarch64 ] && echo aarch64 || echo x86_64)
+          node scripts/image.mjs build e2e --out out/e2e --arch "$arch"
+          docker load -i out/e2e/image.tar
+      - name: Playwright Chromium on the e2e image
+        run: |
+          set -euo pipefail
+          p=$([ "$(uname -m)" = aarch64 ] && echo arm64 || echo amd64)
+          docker run --rm --read-only --tmpfs /tmp:exec --tmpfs /home/nonroot:exec,uid=65532,gid=65532 \
+            -v "$PWD/test/e2e-trial:/trial:ro" "ghcr.io/rhanka/base/e2e:trial-$p" /trial/run-trial.sh | tee trial.log
+          echo "### e2e trial ($p): $(tail -1 trial.log)" >> "$GITHUB_STEP_SUMMARY"
+
+  workshop-check:
+    # The reduced GDAL from the melange workshop resolves against Wolfi gdal, passes the runtime gates
+    # and its five binaries run. Check only: the geo-gdal variant is P3.
+    needs: matrix
+    if: needs.matrix.outputs.images != '[]'
+    runs-on: ubuntu-24.04
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - run: scripts/install-tools.sh && echo "$PWD/.bin" >> "$GITHUB_PATH"
+      - run: |
+          set -euo pipefail
+          node scripts/apks.mjs fetch --all
+          mapfile -t f < <(node --input-type=module -e '
+            import { recipes, releaseOf, apkoFlags } from "./scripts/lib.mjs";
+            const rs = recipes().filter((r) => ["nodejs-26-official", "gdal-tools-geo"].includes(r.name)).map(releaseOf);
+            console.log(apkoFlags(rs).join("\n"));')
+          apko lock test/geo-gdal/apko.yaml "${f[@]}" --output out/geo.lock.json
+          SOURCE_DATE_EPOCH=$(git log -1 --format=%ct) apko build test/geo-gdal/apko.yaml geo-gdal-check:ci out/geo.tar --lockfile out/geo.lock.json "${f[@]}" --sbom=false
+          node scripts/gates.mjs geo-gdal-check out/geo.tar --kind runtime --budget 230
+          docker load -i out/geo.tar
+          for b in ogr2ogr ogrinfo gdalinfo gdal_translate gdalsrsinfo; do
+            docker run --rm --read-only --entrypoint "/usr/bin/$b" geo-gdal-check:ci-amd64 --version
+          done
+
+  collect:
+    needs: image
+    if: always()
+    runs-on: ubuntu-24.04
+    outputs:
+      results: ${{ steps.c.outputs.results }}
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: result-*
+          merge-multiple: true
+          path: results
+      - id: c
+        run: |
+          r=$(jq -sc '.' results/*.json 2>/dev/null || echo '[]')
+          echo "results=$r" >> "$GITHUB_OUTPUT"
+          echo "$r" | jq .
+
+  mirror:
+    # Copy every Wolfi apk named in the committed locks to this repository's releases (design r2,
+    # section 7): Wolfi deletes stale binaries six months after publication.
+    needs: image
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    env:
+      GH_TOKEN: ${{ github.token }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: ${{ inputs.ref || github.sha }}
+      - run: node scripts/mirror.mjs
