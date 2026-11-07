@@ -115,11 +115,14 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
           # One open issue while a published base has a fixable High/Critical, or a Node security release
           # is not in the recipe. Fixes that need a recipe bump (npm, Node) cannot ride a lock refresh.
-          need=$(jq -s '[.[].blocking[]] | length' .work/scans/*.json 2>/dev/null || echo 0)
+          need=0; body=""
+          if compgen -G '.work/scans/*.json' > /dev/null; then
+            need=$(jq -s '[.[].blocking[]] | length' .work/scans/*.json)
+            body=$(jq -sr '[.[] | .subject as $s | .blocking[] | "- \($s | split("/")[-1]) \(.arch): \(.severity) \(.id) in \(.pkg) \(.version), fixed in \(.fixedIn | join(","))"] | join("\n")' .work/scans/*.json)
+          fi
           nodesec=$(jq -r '.node.securityRelease // false' .work/fixes.json 2>/dev/null || echo false)
-          if [ "${need:-0}" != "0" ] || [ "$nodesec" = "true" ]; then
+          if [ "$need" != "0" ] || [ "$nodesec" = "true" ]; then
             title="Fixable High/Critical in a published base image"
-            body=$(jq -sr '[.[] | .subject as $s | .blocking[] | "- \($s | split("/")[-1]) \(.arch): \(.severity) \(.id) in \(.pkg) \(.version), fixed in \(.fixedIn | join(","))"] | join("\n")' .work/scans/*.json 2>/dev/null)
             [ "$nodesec" = "true" ] && body="$body
           - Node.js 26 security release newer than melange/nodejs-26-official.yaml: bump the recipe (scripts/verify-node-release.sh)"
             num=$(gh issue list --state open --search "in:title \"$title\"" --json number -q '.[0].number' || true)
