@@ -162,3 +162,7 @@ Node.js bump PR (the daily job reports new releases).
 
 `e2e` is a trial: Playwright's own Chromium headless shell renders a page on it (`test/e2e-trial`, run by
 the build workflow on amd64 and arm64). Firefox and WebKit are not covered; there are no CJK fonts.
+
+## License
+
+Recipes and scripts in this repository: MIT (see `LICENSE`). Packages and binaries assembled into the published images keep their own licenses (see each image SBOM).
