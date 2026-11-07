@@ -9,6 +9,121 @@
     "prodGo": "owner GO for each rollout that is green in preprod",
     "dispatcher": "dry-run (P1); opening PRs is enabled in P3"
   },
-  "current": {},
-  "rollouts": []
+  "current": {
+    "cc": {
+      "ref": "ghcr.io/rhanka/base/cc",
+      "track": "glibc",
+      "digest": "sha256:608ead866050782e716e7327be93b526e0bde6a292554fba71e8a6dfe377f7e3",
+      "lockSha256": "83a3c3c45e8bab077865f37187dc7b406115d7c5e416ef8781ad3dbf39309ef3",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    },
+    "node-dev": {
+      "ref": "ghcr.io/rhanka/base/node-dev",
+      "track": "26",
+      "digest": "sha256:58863d7ee38016cf17e2294e27c234cd23b08e4e7de1ab325ccf92da2de3bf36",
+      "lockSha256": "84e115ee16822a0d348165786c3b347b2b9ddf91ff39647fff297061892c17c8",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    },
+    "node-poppler": {
+      "ref": "ghcr.io/rhanka/base/node-poppler",
+      "track": "26",
+      "digest": "sha256:02b6df627c4aea071bf01ead5f7f677c3e5910a3cc91098995db098cdaf9b0d2",
+      "lockSha256": "4a7f53bb7beea938026e5206d0361309f845edc451aa4c6d37d94dc0f2465ba8",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    },
+    "node": {
+      "ref": "ghcr.io/rhanka/base/node",
+      "track": "26",
+      "digest": "sha256:d129cffa277046a551baa4f28f11f30e5eb3bde2c1f43ea3faac26183a5e1ca2",
+      "lockSha256": "148d85f903b300f9ffb9a6ed1949c286780bc82a3bb7f9b9c7970f156badb6ad",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    },
+    "toolbox": {
+      "ref": "ghcr.io/rhanka/base/toolbox",
+      "track": "1",
+      "digest": "sha256:4793a57327c2d6f97ab782848ed0e7d5c271cb9a1165ebf384ead966f3a8b4fb",
+      "lockSha256": "a21eb137439b3850eab85cf211578b7d9e8c93643c0d3b14551eb8c885ac36c9",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    },
+    "web": {
+      "ref": "ghcr.io/rhanka/base/web",
+      "track": "mainline",
+      "digest": "sha256:3b12a1360c7315cb987d17b4257214ab3b13e6e737296edb54e3f6e9176905ff",
+      "lockSha256": "3ad556462590b9d64e0759cbd438112984944a836cee219ac6ebec017d4c4838",
+      "since": "2026-11-07",
+      "rollout": "2026-11-07"
+    }
+  },
+  "rollouts": [
+    {
+      "id": "2026-11-07",
+      "date": "2026-11-07",
+      "reason": "initial",
+      "lane": "routine",
+      "deadline": null,
+      "images": {
+        "cc": {
+          "ref": "ghcr.io/rhanka/base/cc",
+          "track": "glibc",
+          "from": null,
+          "to": "sha256:608ead866050782e716e7327be93b526e0bde6a292554fba71e8a6dfe377f7e3",
+          "reasons": [
+            "initial"
+          ]
+        },
+        "node-dev": {
+          "ref": "ghcr.io/rhanka/base/node-dev",
+          "track": "26",
+          "from": null,
+          "to": "sha256:58863d7ee38016cf17e2294e27c234cd23b08e4e7de1ab325ccf92da2de3bf36",
+          "reasons": [
+            "initial"
+          ]
+        },
+        "node-poppler": {
+          "ref": "ghcr.io/rhanka/base/node-poppler",
+          "track": "26",
+          "from": null,
+          "to": "sha256:02b6df627c4aea071bf01ead5f7f677c3e5910a3cc91098995db098cdaf9b0d2",
+          "reasons": [
+            "initial"
+          ]
+        },
+        "node": {
+          "ref": "ghcr.io/rhanka/base/node",
+          "track": "26",
+          "from": null,
+          "to": "sha256:d129cffa277046a551baa4f28f11f30e5eb3bde2c1f43ea3faac26183a5e1ca2",
+          "reasons": [
+            "initial"
+          ]
+        },
+        "toolbox": {
+          "ref": "ghcr.io/rhanka/base/toolbox",
+          "track": "1",
+          "from": null,
+          "to": "sha256:4793a57327c2d6f97ab782848ed0e7d5c271cb9a1165ebf384ead966f3a8b4fb",
+          "reasons": [
+            "initial"
+          ]
+        },
+        "web": {
+          "ref": "ghcr.io/rhanka/base/web",
+          "track": "mainline",
+          "from": null,
+          "to": "sha256:3b12a1360c7315cb987d17b4257214ab3b13e6e737296edb54e3f6e9176905ff",
+          "reasons": [
+            "initial"
+          ]
+        }
+      },
+      "ids": []
+    }
+  ],
+  "updated": "2026-11-07T22:13:49.358Z"
 }
