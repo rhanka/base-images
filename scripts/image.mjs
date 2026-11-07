@@ -76,8 +76,8 @@ switch (cmd) {
     const tags = [`${base}:${track}`, `${base}:${track}-${built.lockSha256.slice(0, 12)}`];
     const refsFile = path.join(dir, 'published.txt');
     run(bin('apko'), ['publish', configPath(name), ...tags, '--sbom=false', '--image-refs', refsFile, ...commonBuildArgs(name)], { env: env(name) });
-    const refs = fs.readFileSync(path.join(ROOT, refsFile), 'utf8').trim().split('\n');
-    const pushed = refs.map((r) => r.split('@')[1]).find(Boolean);
+    // the moving tag must now resolve to the index digest that passed the gates
+    const pushed = execFileSync(bin('crane'), ['digest', tags[0]], { encoding: 'utf8' }).trim();
     if (pushed !== built.digest) throw new Error(`published digest ${pushed} differs from the gated build ${built.digest}`);
     writeJson(path.join(dir, 'publish.json'), { ...built, tags, digest: pushed });
     console.log(`${base}@${pushed}`);

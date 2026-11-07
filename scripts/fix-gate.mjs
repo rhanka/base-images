@@ -37,7 +37,12 @@ for (const rec of indexText.split('\n\n')) {
 }
 const secfixes = new Map(security.packages.map((p) => [p.pkg.name, p.pkg.secfixes || {}]));
 
+const baseDir = opt('--base-dir'); // tests: read the "published" locks from <dir>/<name>.lock.json
 function rawAt(ref, file) {
+  if (baseDir) {
+    const p = path.join(baseDir, `${path.basename(path.dirname(file))}.lock.json`);
+    return fs.existsSync(p) ? fs.readFileSync(p) : null;
+  }
   try {
     return execFileSync('git', ['show', `${ref}:${file}`], { cwd: ROOT, stdio: ['ignore', 'pipe', 'ignore'], maxBuffer: 1 << 26 });
   } catch {

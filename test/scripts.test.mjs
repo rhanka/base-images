@@ -91,3 +91,21 @@ test('dispatcher dry-run plans one PR with every stale reference', () => {
   const refused = spawnSync('node', [path.join(ROOT, 'scripts/dispatch.mjs'), '--root', dir, '--rollout', path.join(dir, 'rollout.json')], { encoding: 'utf8' });
   assert.equal(refused.status, 2);
 });
+
+test('fix gate: a newer locked version listed in secfixes is an available fix; CPE plays no part', () => {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'fixgate-'));
+  const lock = JSON.parse(fs.readFileSync(path.join(ROOT, 'images/cc/apko.lock.json'), 'utf8'));
+  const glibc = lock.contents.packages.find((p) => p.name.startsWith('glibc-2.') && p.architecture === 'x86_64' && !p.name.includes('locale'));
+  const old = structuredClone(lock);
+  for (const p of old.contents.packages) if (p.name === glibc.name) p.version = glibc.version.replace(/-r\d+$/, '-r1');
+  fs.writeFileSync(path.join(dir, 'cc.lock.json'), JSON.stringify(old));
+  for (const n of ['node', 'node-poppler', 'web', 'toolbox', 'node-dev', 'e2e']) fs.copyFileSync(path.join(ROOT, `images/${n}/apko.lock.json`), path.join(dir, `${n}.lock.json`));
+  const sec = { packages: [{ pkg: { name: glibc.name, secfixes: { '0': ['CVE-2000-0001'], [glibc.version]: ['CVE-2026-0001'], [glibc.version.replace(/-r\d+$/, '-r999')]: ['CVE-2026-0002'] } } }] };
+  fs.writeFileSync(path.join(dir, 'security.json'), JSON.stringify(sec));
+  fs.writeFileSync(path.join(dir, 'APKINDEX'), `P:${glibc.name}\nV:${glibc.version}\no:${glibc.name}\nt:1\n\n`);
+  execFileSync('node', [path.join(ROOT, 'scripts/fix-gate.mjs'), '--security', path.join(dir, 'security.json'), '--index', path.join(dir, 'APKINDEX'), '--base-dir', dir, '--report', path.join(dir, 'fixes.json')], { encoding: 'utf8' });
+  const r = JSON.parse(fs.readFileSync(path.join(dir, 'fixes.json'), 'utf8')).images;
+  assert.deepEqual(r.cc.ids, ['CVE-2026-0001']); // fixed in the version the fresh lock reaches
+  assert.equal(r.cc.pendingFixes[0].ids[0], 'CVE-2026-0002'); // listed, not yet reachable
+  assert.equal(r.node.fixes.length, 0);
+});
