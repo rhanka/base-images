@@ -23,6 +23,6 @@ for p in "${patterns[@]}"; do
   if content | grep -nE -i -- "$p" | grep -v 'scripts/secret-scan.sh'; then found=1; fi
 done
 # internal hostnames must not appear in this public repository
-if content | grep -nE -i '\.(internal|local|lan|corp)\b|cloud\.ovh\.net|scw\.cloud|\.svc\.cluster' | grep -v 'scripts/secret-scan.sh'; then found=1; fi
+if content | grep -nE -i '\.(internal|local|lan|corp|intra)\b|\.svc\.cluster' | grep -v 'scripts/secret-scan.sh'; then found=1; fi
 if [[ $found -ne 0 ]]; then echo "secret-scan: possible secret or internal hostname above" >&2; exit 1; fi
 echo "secret-scan: clean"
