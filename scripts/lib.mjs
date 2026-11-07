@@ -59,12 +59,12 @@ export function releaseOf(recipe) {
   return { id, tag: `apk-${id}`, dir: `./apks/${id}` };
 }
 
-/** Platform package releases referenced by a lock file (urls under ./apks/<id>/<arch>/). */
+/** Platform package releases referenced by a lock file (package urls under ./apks/<id>/<arch>/). */
 export function releasesInLock(lockFile) {
   const lock = JSON.parse(fs.readFileSync(lockFile, 'utf8'));
   const ids = new Set();
-  for (const r of lock.contents.repositories || []) {
-    const m = r.url.match(/^\.\/apks\/([^/]+)\//);
+  for (const p of [...(lock.contents.repositories || []), ...(lock.contents.packages || [])]) {
+    const m = p.url.match(/^\.\/apks\/([^/]+)\//);
     if (m) ids.add(m[1]);
   }
   return [...ids].sort().map((id) => ({ id, tag: `apk-${id}`, dir: `./apks/${id}` }));
