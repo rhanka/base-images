@@ -262,7 +262,7 @@ jobs:
           path: results
       - id: c
         run: |
-          r=$(jq -sc '.' results/*.json 2>/dev/null || echo '[]')
+          if compgen -G 'results/*.json' > /dev/null; then r=$(jq -sc '.' results/*.json); else r='[]'; fi
           echo "results=$r" >> "$GITHUB_OUTPUT"
           echo "$r" | jq .
 

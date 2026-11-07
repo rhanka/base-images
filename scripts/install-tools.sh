@@ -41,7 +41,7 @@ fetch() { # name url
 }
 
 want() { # binary version-probe expected
-  [[ -x "$BIN_DIR/$1" ]] && "$BIN_DIR/$1" $2 2>/dev/null | grep -q -- "$3"
+  [[ -x "$BIN_DIR/$1" ]] && "$BIN_DIR/$1" "$2" 2>/dev/null | grep -q -- "$3"
 }
 
 if ! want apko version "$APKO_VERSION"; then
