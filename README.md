@@ -47,8 +47,9 @@ The digest that tenants should use for each image is in [`rollout.json`](rollout
 
 ## Verify an image from a clean machine
 
-You need [cosign](https://github.com/sigstore/cosign/releases) v2.4 or later, `jq`, and for the GitHub
-attestation the [GitHub CLI](https://cli.github.com/). No registry login: the images are public.
+You need [cosign](https://github.com/sigstore/cosign/releases) (tested with v3.1.4), `jq` and
+[crane](https://github.com/google/go-containerregistry/releases). No registry login and no GitHub account:
+the images and their signatures and attestations are public.
 
 ```bash
 IMAGE=ghcr.io/rhanka/base/node
@@ -59,21 +60,26 @@ ISSUER=https://token.actions.githubusercontent.com
 # 1. Signature: made by this repository's build workflow on main, logged in the public Rekor log.
 cosign verify "$IMAGE@$DIGEST" --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER"
 
-# 2. SBOM attestation (SPDX), same identity. Prints the package count of the SBOM.
-cosign verify-attestation --type spdxjson "$IMAGE@$DIGEST" \
+# 2. Provenance (SLSA v1, GitHub artifact attestation), stored next to the image in the registry.
+#    Prints the workflow that built it.
+cosign verify-attestation --type https://slsa.dev/provenance/v1 "$IMAGE@$DIGEST" \
   --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
-  | jq -r '.payload' | base64 -d | jq '.predicate.packages | length'
+  | head -1 | jq -r '.payload' | base64 -d | jq -r '.predicate.buildDefinition.externalParameters.workflow'
 
-# 3. Provenance: GitHub artifact attestation (SLSA build provenance) issued to this repository's workflow.
-#    gh calls the GitHub API, so it needs a GitHub login (any account): gh auth login.
+# 3. SBOM attestation (SPDX). The index carries a short SBOM; each architecture manifest carries the full one.
+ARCH_DIGEST=$(crane digest --platform linux/amd64 "$IMAGE@$DIGEST")   # or: docker buildx imagetools inspect
+cosign verify-attestation --type spdxjson "$IMAGE@$ARCH_DIGEST" \
+  --certificate-identity "$IDENTITY" --certificate-oidc-issuer "$ISSUER" \
+  | head -1 | jq -r '.payload' | base64 -d | jq '.predicate.packages | length'
+```
+
+The same provenance can be checked with the GitHub CLI (v2.49 or later, needs `gh auth login` with any
+account because it calls the GitHub API):
+
+```bash
 gh attestation verify "oci://$IMAGE@$DIGEST" --repo rhanka/base-images \
   --signer-workflow rhanka/base-images/.github/workflows/build.yml
 ```
-
-Each architecture manifest (`crane digest --platform linux/arm64 "$IMAGE@$DIGEST"`) is signed and carries its
-own SBOM attestation too. To avoid the GitHub login for step 3, download the attestation bundle once
-(`gh attestation download oci://$IMAGE@$DIGEST --repo rhanka/base-images`) and verify it anywhere with
-`gh attestation verify ... --bundle <file>`.
 
 ### Rebuild it and compare the digest
 

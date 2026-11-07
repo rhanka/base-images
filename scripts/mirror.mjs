@@ -17,7 +17,7 @@ import { ROOT, REPO, catalog, lockPath } from './lib.mjs';
 const dry = process.argv.includes('--dry-run');
 const gh = (args, opts = {}) => execFileSync('gh', args, { cwd: ROOT, encoding: 'utf8', maxBuffer: 1 << 28, ...opts });
 // GitHub replaces characters outside this set in asset names
-const assetName = (arch, file) => `${arch}.${file}`.replace(/[^A-Za-z0-9._-]/g, '.');
+const assetName = (arch, file) => `${arch}.${file}`.replace(/[^A-Za-z0-9._-]+/g, '.').replace(/\.{2,}/g, '.');
 
 const wanted = new Map();
 for (const name of Object.keys(catalog().images)) {
