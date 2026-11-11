@@ -13,50 +13,50 @@
     "cc": {
       "ref": "ghcr.io/rhanka/base/cc",
       "track": "glibc",
-      "digest": "sha256:608ead866050782e716e7327be93b526e0bde6a292554fba71e8a6dfe377f7e3",
-      "lockSha256": "83a3c3c45e8bab077865f37187dc7b406115d7c5e416ef8781ad3dbf39309ef3",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:c7c50353bbc52cbf813200bb62a98c295b6addc779f8743049b0c2d5d9571d5b",
+      "lockSha256": "5643eb226c82e6b303f29306a72b4cd5acfd070ba7f583dcc650f74909f9ccbc",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     },
     "node-dev": {
       "ref": "ghcr.io/rhanka/base/node-dev",
       "track": "26",
-      "digest": "sha256:58863d7ee38016cf17e2294e27c234cd23b08e4e7de1ab325ccf92da2de3bf36",
-      "lockSha256": "84e115ee16822a0d348165786c3b347b2b9ddf91ff39647fff297061892c17c8",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:718315cc3756cc44339a30ea422ce6373f85339ea12da6b3e5c179bd9844fcfd",
+      "lockSha256": "c90318b8eff4f96f9deedf4ca99c431fb17b0875066b57d4dd056d380c86fc6b",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     },
     "node-poppler": {
       "ref": "ghcr.io/rhanka/base/node-poppler",
       "track": "26",
-      "digest": "sha256:02b6df627c4aea071bf01ead5f7f677c3e5910a3cc91098995db098cdaf9b0d2",
-      "lockSha256": "4a7f53bb7beea938026e5206d0361309f845edc451aa4c6d37d94dc0f2465ba8",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:ea7728efdfc96994508f7060810b0d5c713c196927b9ea00b0ba3ad36cb4fa96",
+      "lockSha256": "2fea4c90adf04b94ed23af62035c3fe2f393be6bdf4dc2d9bfe5710eb3091448",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     },
     "node": {
       "ref": "ghcr.io/rhanka/base/node",
       "track": "26",
-      "digest": "sha256:d129cffa277046a551baa4f28f11f30e5eb3bde2c1f43ea3faac26183a5e1ca2",
-      "lockSha256": "148d85f903b300f9ffb9a6ed1949c286780bc82a3bb7f9b9c7970f156badb6ad",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:4171fc11a57b213220b08d0d058e19a4449004b64376bf1515c666c8016a4930",
+      "lockSha256": "49a6fdb7b73940808ac2ec0dfbad019e3b92262b1330fce6ad54e3aafc8829b7",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     },
     "toolbox": {
       "ref": "ghcr.io/rhanka/base/toolbox",
       "track": "1",
-      "digest": "sha256:4793a57327c2d6f97ab782848ed0e7d5c271cb9a1165ebf384ead966f3a8b4fb",
-      "lockSha256": "a21eb137439b3850eab85cf211578b7d9e8c93643c0d3b14551eb8c885ac36c9",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:9ec325ba48ec7531cf1ed14955220301df38e2b033149d32419ff4fc9da20db5",
+      "lockSha256": "01a1858f10df633b07f8d49673728b66cdf41e0db287a13e0dc1e2a99cbef6f3",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     },
     "web": {
       "ref": "ghcr.io/rhanka/base/web",
       "track": "mainline",
-      "digest": "sha256:3b12a1360c7315cb987d17b4257214ab3b13e6e737296edb54e3f6e9176905ff",
-      "lockSha256": "3ad556462590b9d64e0759cbd438112984944a836cee219ac6ebec017d4c4838",
-      "since": "2026-11-07",
-      "rollout": "2026-11-07"
+      "digest": "sha256:12c5441b81701e3358e3acfa9aa3cf1402aaa0b597c71907e315d5a1138880f0",
+      "lockSha256": "8b81002c148a5ca40e648bd69857f6b3172c4142b2d37c1c05313de12212791f",
+      "since": "2026-11-11",
+      "rollout": "2026-11-11"
     }
   },
   "rollouts": [
@@ -123,7 +123,74 @@
         }
       },
       "ids": []
+    },
+    {
+      "id": "2026-11-11",
+      "date": "2026-11-11",
+      "reason": "fix-available",
+      "lane": "routine",
+      "deadline": null,
+      "images": {
+        "cc": {
+          "ref": "ghcr.io/rhanka/base/cc",
+          "track": "glibc",
+          "from": "sha256:608ead866050782e716e7327be93b526e0bde6a292554fba71e8a6dfe377f7e3",
+          "to": "sha256:c7c50353bbc52cbf813200bb62a98c295b6addc779f8743049b0c2d5d9571d5b",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "node-dev": {
+          "ref": "ghcr.io/rhanka/base/node-dev",
+          "track": "26",
+          "from": "sha256:58863d7ee38016cf17e2294e27c234cd23b08e4e7de1ab325ccf92da2de3bf36",
+          "to": "sha256:718315cc3756cc44339a30ea422ce6373f85339ea12da6b3e5c179bd9844fcfd",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "node-poppler": {
+          "ref": "ghcr.io/rhanka/base/node-poppler",
+          "track": "26",
+          "from": "sha256:02b6df627c4aea071bf01ead5f7f677c3e5910a3cc91098995db098cdaf9b0d2",
+          "to": "sha256:ea7728efdfc96994508f7060810b0d5c713c196927b9ea00b0ba3ad36cb4fa96",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "node": {
+          "ref": "ghcr.io/rhanka/base/node",
+          "track": "26",
+          "from": "sha256:d129cffa277046a551baa4f28f11f30e5eb3bde2c1f43ea3faac26183a5e1ca2",
+          "to": "sha256:4171fc11a57b213220b08d0d058e19a4449004b64376bf1515c666c8016a4930",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "toolbox": {
+          "ref": "ghcr.io/rhanka/base/toolbox",
+          "track": "1",
+          "from": "sha256:4793a57327c2d6f97ab782848ed0e7d5c271cb9a1165ebf384ead966f3a8b4fb",
+          "to": "sha256:9ec325ba48ec7531cf1ed14955220301df38e2b033149d32419ff4fc9da20db5",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "web": {
+          "ref": "ghcr.io/rhanka/base/web",
+          "track": "mainline",
+          "from": "sha256:3b12a1360c7315cb987d17b4257214ab3b13e6e737296edb54e3f6e9176905ff",
+          "to": "sha256:12c5441b81701e3358e3acfa9aa3cf1402aaa0b597c71907e315d5a1138880f0",
+          "reasons": [
+            "fix-available"
+          ]
+        }
+      },
+      "ids": [
+        "CVE-2026-84243",
+        "GHSA-8rvm-662m-jvqv"
+      ]
     }
   ],
-  "updated": "2026-11-07T22:13:49.358Z"
+  "updated": "2026-11-11T12:58:33.516Z"
 }
