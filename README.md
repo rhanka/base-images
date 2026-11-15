@@ -121,7 +121,7 @@ images/<name>/apko.yaml + apko.lock.json ───────┴► apko build,
     requires a `VALIDSIG` from a listed primary fingerprint (an expired or revoked key fails even though gpg
     exits 0), and requires the recipe's sha256 values to equal the signed ones. It blocks the melange build.
     The subpackage `nodejs-26-official-npm` ships npm from the npm registry (sha512-pinned, same major as
-    bundled): the npm bundled in Node 26.13.0 carries fixable High advisories (`brace-expansion`, `undici`).
+    bundled): the npm bundled in Node 26.13.1 (11.20.0) carries fixable High advisories (`brace-expansion`, `undici`).
   - `gdal-tools-geo`: `ogr2ogr`, `ogrinfo`, `gdalinfo`, `gdal_translate`, `gdalsrsinfo` from the
     sha256-pinned Wolfi `gdal-tools` apk, without its developer `.py` scripts and its `cmd:bash` dependency.
   - `at-spi2-core-libatspi`: `libatspi.so.0` without the Python bindings that make Wolfi's `at-spi2-core`
