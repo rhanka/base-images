@@ -21,26 +21,26 @@
     "node-dev": {
       "ref": "ghcr.io/rhanka/base/node-dev",
       "track": "26",
-      "digest": "sha256:718315cc3756cc44339a30ea422ce6373f85339ea12da6b3e5c179bd9844fcfd",
-      "lockSha256": "c90318b8eff4f96f9deedf4ca99c431fb17b0875066b57d4dd056d380c86fc6b",
-      "since": "2026-11-11",
-      "rollout": "2026-11-11"
+      "digest": "sha256:5e4b24ffa6d55d353e76610fac28ac6fe643aaba1135419bc290c34ec688b246",
+      "lockSha256": "e544ad7de179fd8c784041ed9d4d601d76e755834e1940d985adc50630f333a5",
+      "since": "2026-11-15",
+      "rollout": "2026-11-15"
     },
     "node-poppler": {
       "ref": "ghcr.io/rhanka/base/node-poppler",
       "track": "26",
-      "digest": "sha256:ea7728efdfc96994508f7060810b0d5c713c196927b9ea00b0ba3ad36cb4fa96",
-      "lockSha256": "2fea4c90adf04b94ed23af62035c3fe2f393be6bdf4dc2d9bfe5710eb3091448",
-      "since": "2026-11-11",
-      "rollout": "2026-11-11"
+      "digest": "sha256:b77c4304f7493db9ac2da1cdcec5dd982e8de20d817760beb8d0197a1b422cf6",
+      "lockSha256": "ec4cbc72f84db21e7a19656158902da65aa5220eaaa8622cd3e06ec5d45dc84d",
+      "since": "2026-11-15",
+      "rollout": "2026-11-15"
     },
     "node": {
       "ref": "ghcr.io/rhanka/base/node",
       "track": "26",
-      "digest": "sha256:4171fc11a57b213220b08d0d058e19a4449004b64376bf1515c666c8016a4930",
-      "lockSha256": "49a6fdb7b73940808ac2ec0dfbad019e3b92262b1330fce6ad54e3aafc8829b7",
-      "since": "2026-11-11",
-      "rollout": "2026-11-11"
+      "digest": "sha256:edae2ce10f0116a514fd3a2b942cc531e311f8f991b52a5f3866e9c4c1a3de9b",
+      "lockSha256": "9d63f2e8ff806333b809b8ae4e3d1d8f860a3dd00983e80ba5dcde8723d5a47d",
+      "since": "2026-11-15",
+      "rollout": "2026-11-15"
     },
     "toolbox": {
       "ref": "ghcr.io/rhanka/base/toolbox",
@@ -190,7 +190,44 @@
         "CVE-2026-84243",
         "GHSA-8rvm-662m-jvqv"
       ]
+    },
+    {
+      "id": "2026-11-15",
+      "date": "2026-11-15",
+      "reason": "config-change",
+      "lane": "routine",
+      "deadline": null,
+      "images": {
+        "node-dev": {
+          "ref": "ghcr.io/rhanka/base/node-dev",
+          "track": "26",
+          "from": "sha256:718315cc3756cc44339a30ea422ce6373f85339ea12da6b3e5c179bd9844fcfd",
+          "to": "sha256:5e4b24ffa6d55d353e76610fac28ac6fe643aaba1135419bc290c34ec688b246",
+          "reasons": [
+            "config-change"
+          ]
+        },
+        "node-poppler": {
+          "ref": "ghcr.io/rhanka/base/node-poppler",
+          "track": "26",
+          "from": "sha256:ea7728efdfc96994508f7060810b0d5c713c196927b9ea00b0ba3ad36cb4fa96",
+          "to": "sha256:b77c4304f7493db9ac2da1cdcec5dd982e8de20d817760beb8d0197a1b422cf6",
+          "reasons": [
+            "config-change"
+          ]
+        },
+        "node": {
+          "ref": "ghcr.io/rhanka/base/node",
+          "track": "26",
+          "from": "sha256:4171fc11a57b213220b08d0d058e19a4449004b64376bf1515c666c8016a4930",
+          "to": "sha256:edae2ce10f0116a514fd3a2b942cc531e311f8f991b52a5f3866e9c4c1a3de9b",
+          "reasons": [
+            "config-change"
+          ]
+        }
+      },
+      "ids": []
     }
   ],
-  "updated": "2026-11-11T12:58:33.516Z"
+  "updated": "2026-11-15T16:42:10.158Z"
 }
