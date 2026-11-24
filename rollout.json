@@ -21,18 +21,18 @@
     "node-dev": {
       "ref": "ghcr.io/rhanka/base/node-dev",
       "track": "26",
-      "digest": "sha256:5e4b24ffa6d55d353e76610fac28ac6fe643aaba1135419bc290c34ec688b246",
-      "lockSha256": "e544ad7de179fd8c784041ed9d4d601d76e755834e1940d985adc50630f333a5",
-      "since": "2026-11-15",
-      "rollout": "2026-11-15"
+      "digest": "sha256:c5040cd55a12d3a71cda6e9cdab192daf9df12f084959d41b5cde687e2fc5b51",
+      "lockSha256": "f8f719d35666048424873990e8b0f37beac40254a5d8b5c541913f1dfce0af4d",
+      "since": "2026-11-24",
+      "rollout": "2026-11-24"
     },
     "node-poppler": {
       "ref": "ghcr.io/rhanka/base/node-poppler",
       "track": "26",
-      "digest": "sha256:b77c4304f7493db9ac2da1cdcec5dd982e8de20d817760beb8d0197a1b422cf6",
-      "lockSha256": "ec4cbc72f84db21e7a19656158902da65aa5220eaaa8622cd3e06ec5d45dc84d",
-      "since": "2026-11-15",
-      "rollout": "2026-11-15"
+      "digest": "sha256:5712027d54199d8d788d250fda1179addb9b514e0f250c74b980de5a13690866",
+      "lockSha256": "7cd2935e6afebbaaaaddadcb576c93f4157482e676be222002c027d509794dc7",
+      "since": "2026-11-24",
+      "rollout": "2026-11-24"
     },
     "node": {
       "ref": "ghcr.io/rhanka/base/node",
@@ -227,7 +227,40 @@
         }
       },
       "ids": []
+    },
+    {
+      "id": "2026-11-24",
+      "date": "2026-11-24",
+      "reason": "fix-available",
+      "lane": "routine",
+      "deadline": null,
+      "images": {
+        "node-dev": {
+          "ref": "ghcr.io/rhanka/base/node-dev",
+          "track": "26",
+          "from": "sha256:5e4b24ffa6d55d353e76610fac28ac6fe643aaba1135419bc290c34ec688b246",
+          "to": "sha256:c5040cd55a12d3a71cda6e9cdab192daf9df12f084959d41b5cde687e2fc5b51",
+          "reasons": [
+            "fix-available"
+          ]
+        },
+        "node-poppler": {
+          "ref": "ghcr.io/rhanka/base/node-poppler",
+          "track": "26",
+          "from": "sha256:b77c4304f7493db9ac2da1cdcec5dd982e8de20d817760beb8d0197a1b422cf6",
+          "to": "sha256:5712027d54199d8d788d250fda1179addb9b514e0f250c74b980de5a13690866",
+          "reasons": [
+            "fix-available"
+          ]
+        }
+      },
+      "ids": [
+        "CVE-2026-124317",
+        "CVE-2026-128241",
+        "GHSA-2qp8-23fp-hmf7",
+        "GHSA-wm22-jw4m-rfcf"
+      ]
     }
   ],
-  "updated": "2026-11-15T16:42:10.158Z"
+  "updated": "2026-11-24T16:13:07.775Z"
 }
