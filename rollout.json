@@ -53,10 +53,10 @@
     "web": {
       "ref": "ghcr.io/rhanka/base/web",
       "track": "mainline",
-      "digest": "sha256:12c5441b81701e3358e3acfa9aa3cf1402aaa0b597c71907e315d5a1138880f0",
-      "lockSha256": "8b81002c148a5ca40e648bd69857f6b3172c4142b2d37c1c05313de12212791f",
-      "since": "2026-11-11",
-      "rollout": "2026-11-11"
+      "digest": "sha256:e1e60acee37ab61e6546cd25dc2a38e133ea52d47b0910039a76cfb91d98ea3a",
+      "lockSha256": "687383a44df01d808f575a90bcb838c74fd573aa42adfd850e5fa7e464026f45",
+      "since": "2026-11-26",
+      "rollout": "2026-11-26"
     }
   },
   "rollouts": [
@@ -260,7 +260,26 @@
         "GHSA-2qp8-23fp-hmf7",
         "GHSA-wm22-jw4m-rfcf"
       ]
+    },
+    {
+      "id": "2026-11-26",
+      "date": "2026-11-26",
+      "reason": "config-change",
+      "lane": "security",
+      "deadline": "2026-11-29T00:00:00.000Z",
+      "images": {
+        "web": {
+          "ref": "ghcr.io/rhanka/base/web",
+          "track": "mainline",
+          "from": "sha256:12c5441b81701e3358e3acfa9aa3cf1402aaa0b597c71907e315d5a1138880f0",
+          "to": "sha256:e1e60acee37ab61e6546cd25dc2a38e133ea52d47b0910039a76cfb91d98ea3a",
+          "reasons": [
+            "config-change"
+          ]
+        }
+      },
+      "ids": []
     }
   ],
-  "updated": "2026-11-24T16:13:07.775Z"
+  "updated": "2026-11-26T15:35:14.529Z"
 }
